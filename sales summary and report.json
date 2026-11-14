@@ -1,0 +1,651 @@
+{
+  "name": "sales summary and report",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        112
+      ],
+      "id": "e28315be-75a0-40bf-bf2d-aa6ea520981c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "order",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.wooCommerce",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        112
+      ],
+      "id": "4279969a-acbb-41af-ae3b-6b3d49149a1e",
+      "name": "Get many orders",
+      "credentials": {
+        "wooCommerceApi": {
+          "id": "Q3WCsgphXnpdc8dW",
+          "name": "WooCommerce account 48"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let totalSales = 0;\nconst items = $input.all();\n\nfor (const item of items) {\n  const orderTotal = parseFloat(item.json.total || 0);\n  totalSales += orderTotal;\n}\n\nreturn [{\n  json: {\n    totalSales: totalSales,\n    totalOrders: items.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -256
+      ],
+      "id": "9378a3fd-1e69-45ad-a66c-82260f005a4e",
+      "name": "calculate sales summury"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst customerAnalysis = {};\n\nfor (const item of items) {\n  const customerId = item.json.customer_id;\n  const orderTotal = parseFloat(item.json.total || 0);\n\n  if (customerId !== undefined && customerId !== null) {\n    if (customerAnalysis[customerId]) {\n      customerAnalysis[customerId].totalSpent += orderTotal;\n      customerAnalysis[customerId].orderCount += 1;\n    } else {\n      customerAnalysis[customerId] = {\n        customerId: customerId,\n        totalSpent: orderTotal,\n        orderCount: 1\n      };\n    }\n  }\n}\n\nreturn Object.values(customerAnalysis).map(data => {\n  return {\n    json: data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        80
+      ],
+      "id": "11ff7b70-ef64-40ff-b78d-8946d76d40b2",
+      "name": "customer analysis"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -64,
+        -144
+      ],
+      "id": "6224ac79-db40-4862-b1e3-a2001d6643c6",
+      "name": "Merge"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        144,
+        -64
+      ],
+      "id": "ec507396-bdc6-4b1e-9cb6-1eeafcb25a94",
+      "name": "Merge customer data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst customerAnalysis = {};\n\nfor (const item of items) {\n  const customerId = item.json.customer_id;\n  const orderTotal = parseFloat(item.json.total || 0);\n\n  if (customerId !== undefined && customerId !== null) {\n    if (customerAnalysis[customerId]) {\n      customerAnalysis[customerId].totalSpent += orderTotal;\n      customerAnalysis[customerId].orderCount += 1;\n    } else {\n      customerAnalysis[customerId] = {\n        customerId: customerId,\n        totalSpent: orderTotal,\n        orderCount: 1\n      };\n    }\n  }\n}\n\nreturn Object.values(customerAnalysis).map(data => {\n  return {\n    json: data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        240
+      ],
+      "id": "46eb00e8-a41a-44b5-b868-6e26672beb93",
+      "name": "calculate refunds"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        368,
+        80
+      ],
+      "id": "73327c8a-2be3-4d09-a84a-0059e433d8ab",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const salesSummary = $('calculate sales summury').all()[0]?.json || {};\nconst productSales = $('calculate product sales').all() || [];\nconst customerAnalysis = $('customer analysis').all() || [];\nconst refunds = $('calculate refunds').all() || [];\n\nreturn [{\n  json: {\n    reportDate: new Date().toISOString(),\n    totalSales: salesSummary.totalSales || 0,\n    totalOrders: salesSummary.totalOrders || 0,\n    totalProductsSold: productSales.length,\n    totalCustomers: customerAnalysis.length,\n    totalRefunds: refunds.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        80
+      ],
+      "id": "82f24684-4a31-475b-957a-63e7f295157f",
+      "name": "prepared final sales report"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst productSales = {};\n\nfor (const item of items) {\n  const lineItems = item.json.line_items;\n  if (lineItems && Array.isArray(lineItems)) {\n    for (const lineItem of lineItems) {\n      const productName = lineItem.name;\n      const quantity = lineItem.quantity;\n      if (productName) {\n        if (productSales[productName]) {\n          productSales[productName] += parseInt(quantity, 10) || 0;\n        } else {\n          productSales[productName] = parseInt(quantity, 10) || 0;\n        }\n      }\n    }\n  }\n}\n\nreturn Object.entries(productSales).map(([product, quantity]) => {\n  return {\n    json: {\n      product: product,\n      totalQuantity: quantity\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -80
+      ],
+      "id": "c0fb7998-bf5b-497c-a183-760b4189eb93",
+      "name": "calculate product sales"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ODIrM7WRj_iUzxiYuFEROdmzmizSndLzhc-SC-xS8sM",
+          "mode": "list",
+          "cachedResultName": "woocommerce information",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ODIrM7WRj_iUzxiYuFEROdmzmizSndLzhc-SC-xS8sM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ODIrM7WRj_iUzxiYuFEROdmzmizSndLzhc-SC-xS8sM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order name": "={{ $('Get many orders').item.json.line_items[0].name }}",
+            "order id": "={{ $('Get many orders').item.json.id }}",
+            "total ammount": "={{ $('Get many orders').item.json.line_items[0].total }}",
+            "order number": "={{ $('Get many orders').item.json.line_items[0].quantity }}",
+            "customer email": "={{ $('Get many orders').item.json.billing.email }}",
+            "oder status": "={{ $('Get many orders').item.json.status }}",
+            "invoice date": "={{ $('Get many orders').item.json.date_completed }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order name",
+              "displayName": "order name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order id",
+              "displayName": "order id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "order number",
+              "displayName": "order number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer email",
+              "displayName": "customer email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice date",
+              "displayName": "invoice date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total ammount",
+              "displayName": "total ammount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "oder status",
+              "displayName": "oder status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        880,
+        -96
+      ],
+      "id": "00dcbf3b-f44f-4999-8cf9-6779baf9794b",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0AZPjQQi7iHy2zIQ",
+          "name": "Google Sheets account 199"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const data = item.json;\n  item.json = {\n    \"order name\": `Order #${data.id}`,\n    \"order id\": data.id,\n    \"order number\": data.id,\n    \"customer email\": data.billing ? data.billing.email : \"N/A\",\n    \"invoice date\": data.date_created,\n    \"total ammount\": parseFloat(data.total),\n    \"oder status\": data.status\n  };\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        480
+      ],
+      "id": "7511ef93-63cb-4dbc-a3a5-90283a2bf85b",
+      "name": "prepare invoice data"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const data = item.json;\n  \n  const invoiceHtml = `\n  <html>\n    <head>\n      <style>\n        body { font-family: Arial, sans-serif; }\n        .invoice-box { max-width: 800px; padding: 30px; border: 1px solid #eee; margin: auto; }\n        .header { font-size: 24px; font-weight: bold; margin-bottom: 20px; }\n      </style>\n    </head>\n    <body>\n      <div class=\"invoice-box\">\n        <div class=\"header\">Invoice for ${data[\"order name\"]}</div>\n        <p><strong>Order ID:</strong> ${data[\"order id\"]}</p>\n        <p><strong>Customer Email:</strong> ${data[\"customer email\"]}</p>\n        <p><strong>Invoice Date:</strong> ${data[\"invoice date\"]}</p>\n        <p><strong>Total Amount:</strong> $${data[\"total ammount\"]}</p>\n        <p><strong>Status:</strong> ${data[\"oder status\"]}</p>\n      </div>\n    </body>\n  </html>\n  `;\n  \n  item.json.html = invoiceHtml;\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        480
+      ],
+      "id": "eb7862fb-a0b3-4cee-a47d-7d897544423f",
+      "name": "generate invoice html"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const html = item.json.html;\n  const fileName = \"invoice.html\";\n  const buffer = Buffer.from(html, 'utf-8');\n  \n  item.binary = {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/html',\n      fileName: fileName,\n      fileSize: buffer.length\n    }\n  };\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        480
+      ],
+      "id": "d4065b58-63fb-44e8-be1d-df3040b53c2c",
+      "name": "convert html to file"
+    },
+    {
+      "parameters": {
+        "operation": "URL/HTML to PDF",
+        "convertType": "htmlToPDF",
+        "html": "={{ $('generate invoice html').first().json.html }}",
+        "advancedOptions": {}
+      },
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1.1,
+      "position": [
+        464,
+        480
+      ],
+      "id": "c826c2b8-9b6a-4f5c-a520-a0590c983dc9",
+      "name": "PDFco Api",
+      "credentials": {
+        "pdfcoApi": {
+          "id": "PjOVgd1084prbf4n",
+          "name": "PDF.co account 7"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "tinny4958@gmail.com",
+        "subject": "daily sales report",
+        "message": "=```html\n<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f9f9f9; padding: 20px; }\n  .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }\n  .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }\n  .header h2 { color: #2c3e50; margin: 0; }\n  .content { margin-bottom: 30px; }\n  .summary-box { background: #34495e; color: #fff; padding: 20px; border-radius: 6px; text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 30px; }\n  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n  table, th, td { border: 1px solid #ddd; }\n  th, td { padding: 12px; text-align: left; }\n  th { background-color: #f2f2f2; color: #333; }\n  .footer { text-align: center; font-size: 14px; color: #777; border-top: 1px solid #eee; padding-top: 20px; }\n</style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h2>Daily Sales Report</h2>\n      <p>Performance & Financial Summary</p>\n    </div>\n    <div class=\"content\">\n      <p>Dear Team,</p>\n      <p>Here is the detailed sales summary for today. Please review the key metrics below:</p>\n      \n      <div class=\"summary-box\">\n        Total Revenue: $400.00\n      </div>\n\n      <h3>Product Sales Breakdown</h3>\n      <table>\n        <tr>\n          <th>Category</th>\n          <th>Units Sold</th>\n          <th>Gross Revenue</th>\n        </tr>\n        <tr>\n          <td>Electronics</td>\n          <td>1</td>\n          <td>$200.00</td>\n        </tr>\n        <tr>\n          <td>Toner</td>\n          <td>1</td>\n          <td>$200.00</td>\n        </tr>\n      </table>\n\n      <h3>Customer Insights Summary</h3>\n      <table>\n        <tr>\n          <th>Metric</th>\n          <th>Count</th>\n        </tr>\n        <tr>\n          <td>New Customers</td>\n          <td>1</td>\n        </tr>\n        <tr>\n          <td>Returning Customers</td>\n          <td>1</td>\n        </tr>\n      </table>\n\n      <h3>Financial Adjustments</h3>\n      <table>\n        <tr>\n          <th>Metric</th>\n          <th>Count</th>\n        </tr>\n        <tr>\n          <td>Refunds</td>\n          <td>1</td>\n        </tr>\n      </table>\n    </div>\n    \n    <div class=\"footer\">\n      <p>Best regards,<br>Sales & Analytics Team</p>\n    </div>\n  </div>\n</body>\n</html>\n```",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        480
+      ],
+      "id": "970d1e7a-bdb0-4e71-91ff-e3b272fdfe08",
+      "name": "Send a message",
+      "webhookId": "ac1e578e-efcf-4857-a9b4-7f3af2e966d9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Y003GLARChot70pp",
+          "name": "Gmail account 354"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "tinny4958@gmail.com",
+        "subject": "your sales summary",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody { font-family: Arial, sans-serif; color: #333; line-height: 1.6; }\n.container { width: 80%; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }\nh2 { color: #0056b3; }\ntable { width: 100%; border-collapse: collapse; margin-top: 15px; }\nth, td { border: 1px solid #ccc; padding: 10px; text-align: left; }\nth { background-color: #f2f2f2; }\n</style>\n</head>\n<body>\n<div class=\"container\">\n  <h2>Sales Summary Report</h2>\n  <p>Dear Team,</p>\n  <p>Please find below the comprehensive sales summary based on the recent analysis, customer data, and refund calculations.</p>\n  \n  <h3>Key Highlights:</h3>\n  <table>\n    <tr>\n      <th>Metric</th>\n      <th>Details</th>\n    </tr>\n    <tr>\n      <td>Total Sales</td>\n      <td>[{{ $json.totalSales }}]</td>\n    </tr>\n    <tr>\n      <td>Total Orders</td>\n      <td>[{{ $json.totalOrders }}]</td>\n    </tr>\n    <tr>\n      <td>Total Refunds</td>\n      <td>[{{ $json.totalRefunds }}]</td>\n    </tr>\n    <tr>\n      <td>Customer Data Insights</td>\n      <td>[{{ $('Get many orders').item.json.status }}]</td>\n    </tr>\n  </table>\n\n  <p>For a detailed breakdown, please review the attached reports and documents generated by the workflow.</p>\n  \n  <p>Best regards,<br>\n  [Your Name]</p>\n</div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        176
+      ],
+      "id": "7ac6d6d1-bdfc-4114-8035-a489e4458b8a",
+      "name": "Send a message1",
+      "webhookId": "34c581c2-b941-4a3f-8138-1d756d66ed32",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Y003GLARChot70pp",
+          "name": "Gmail account 354"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1008,
+        400
+      ],
+      "id": "b822e5bb-4393-4d0d-8fd4-3ba117b5f7c9",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0].json;\nconst messageId = item.id;\nconst gmailLink = `https://mail.google.com/mail/u/0/#inbox/${messageId}`;\nitem.gmailLink = gmailLink;\n\nconst fileContent = JSON.stringify(item, null, 2);\nconst buffer = Buffer.from(fileContent, 'utf-8');\n\nreturn [{\n  json: {},\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'application/json',\n      fileName: 'sales_summary.json'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        480
+      ],
+      "id": "bfbfbda7-378f-4c03-885f-ffd00840cc4f",
+      "name": "prepare link for drive"
+    },
+    {
+      "parameters": {
+        "name": "sales report",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1cQ_vcl2DMVcyNrb8yMee8lsnSi0nCDG1",
+          "mode": "list",
+          "cachedResultName": "tinny",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1cQ_vcl2DMVcyNrb8yMee8lsnSi0nCDG1"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1184,
+        480
+      ],
+      "id": "722861dd-d6a3-4d92-b39f-00b8ecdce0cb",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GrJOYONHZRJNgEaH",
+          "name": "Google Drive account 107"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get many orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many orders": {
+      "main": [
+        [
+          {
+            "node": "calculate sales summury",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "calculate product sales",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "customer analysis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "calculate refunds",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "prepare invoice data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculate sales summury": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge customer data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "customer analysis": {
+      "main": [
+        [
+          {
+            "node": "Merge customer data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculate refunds": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge customer data": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "prepared final sales report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculate product sales": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepared final sales report": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare invoice data": {
+      "main": [
+        [
+          {
+            "node": "generate invoice html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate invoice html": {
+      "main": [
+        [
+          {
+            "node": "convert html to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "convert html to file": {
+      "main": [
+        [
+          {
+            "node": "PDFco Api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDFco Api": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "prepare link for drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare link for drive": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "596d1ff0-2158-4444-8029-c543c2a22af4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ab95a641c1b7099ef407af1cf01df77e8f73a8620f3dfa9286ddaad6ae2c066b"
+  },
+  "nodeGroups": [],
+  "id": "8YwFBjEeKUwpmMmW",
+  "tags": []
+}
